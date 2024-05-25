@@ -72,6 +72,7 @@ pub fn generateFunction(
         .wasm32,
         .wasm64,
         => return @import("arch/wasm/CodeGen.zig").generate(lf, src_loc, func_index, air, liveness, code, debug_output),
+        .avr => return @import("arch/avr/CodeGen.zig").generate(lf, src_loc, func_index, air, liveness, code, debug_output),
         else => unreachable,
     }
 }

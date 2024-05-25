@@ -730,7 +730,7 @@ pub const CompilerBackend = enum(u64) {
     /// The reference implementation self-hosted compiler of Zig, using the
     /// spirv backend.
     stage2_spirv64 = 11,
-
+    stage2_avr = 12,
     _,
 };
 

@@ -24,6 +24,7 @@ pub const simplified_logic =
     builtin.cpu.arch == .spirv32 or
     builtin.cpu.arch == .spirv64 or
     builtin.zig_backend == .stage2_riscv64;
+// builtin.zig_backend == .stage2_avr;
 
 comptime {
     // No matter what, we import the root file, so that any export, test, comptime
