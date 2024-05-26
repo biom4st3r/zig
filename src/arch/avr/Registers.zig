@@ -9,10 +9,24 @@ pub const IORegisters = struct {
     pub const SP_L: u6 = 0x3d;
     pub const SP_H: u6 = 0x3e;
 };
+
+pub const RegRanges = struct {
+    pub const caller_saved: RegisterManager.RegisterBitSet = blk: {
+        var set = RegisterManager.RegisterBitSet.initEmpty();
+        set.setRangeValue(.{ .start = 18 - 2, .end = 29 - 2 }, true);
+        break :blk set;
+    };
+};
 pub const Register = enum {
     pub fn isCalleeSaved(r: Register) bool {
         return std.mem.indexOfScalar(Register, callee_saved, r) != null;
     }
+    pub const small_registers: []const Register = &.{
+        .r24, .r26, .r28, .r30,
+    };
+    pub const mul_registers: []const Register = &.{
+        .r16, .r17, .r18, .r19, .r20, .r21, .r22, .r23,
+    };
     // zig fmt: off
     pub const caller_saved: []const Register = &.{ 
         .r18, .r19, .r20, .r21, 
@@ -42,6 +56,10 @@ pub const Register = enum {
     r8,  r9,  r10, r11, r12, r13, r14, r15,
     r16, r17, r18, r19, r20, r21, r22, r23,
     r24, r25, r26, r27, r28, r29, r30, r31,
+    /// Required by RegisterManager
+    pub fn id(r: @This()) u5 {
+        return @intFromEnum(r);
+    }
 
     // Prepended to 16-bit addresses
     //   to form 24-bit addresses

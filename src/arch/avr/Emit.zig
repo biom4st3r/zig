@@ -6,6 +6,12 @@ const Self = @This();
 pub fn emit(self: Self, mir: []Mir.Insn, bin_file: *link.File) void {
     _ = bin_file; // autofix
     for (mir) |insn| switch (insn.tag) {
+        .placeholder,
+        .dbg_stmt,
+        .dbg_inline_block,
+        .dbg_var_ptr,
+        .dbg_var_val,
+        => unreachable,
         .SEC,
         .CLC,
         .SEN,

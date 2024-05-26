@@ -2233,6 +2233,10 @@ pub const R_RISCV = enum(u32) {
     _,
 };
 
+pub const R_AVR = enum(u32) {
+    _,
+};
+
 pub const STV = enum(u2) {
     DEFAULT = 0,
     INTERNAL = 1,

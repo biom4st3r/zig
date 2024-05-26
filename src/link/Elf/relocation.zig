@@ -73,11 +73,16 @@ const riscv64_relocs = Table(11, elf.R_RISCV, .{
     .{ .tlsdesc, .TLSDESC },
 });
 
+//TODO This is 100% incorrect. I don't know what relocations are...
+// const avr_relocs = Table(0, elf.R_AVR, .{});
+
 pub fn decode(r_type: u32, cpu_arch: std.Target.Cpu.Arch) ?Kind {
     return switch (cpu_arch) {
         .x86_64 => x86_64_relocs.decode(r_type),
         .aarch64 => aarch64_relocs.decode(r_type),
         .riscv64 => riscv64_relocs.decode(r_type),
+        //TODO This is 100% incorrect. I don't know what relocations are...
+        .avr => riscv64_relocs.decode(r_type),
         else => @panic("TODO unhandled cpu arch"),
     };
 }
@@ -87,6 +92,8 @@ pub fn encode(comptime kind: Kind, cpu_arch: std.Target.Cpu.Arch) u32 {
         .x86_64 => x86_64_relocs.encode(kind),
         .aarch64 => aarch64_relocs.encode(kind),
         .riscv64 => riscv64_relocs.encode(kind),
+        //TODO This is 100% incorrect. I don't know what relocations are...
+        .avr => riscv64_relocs.encode(kind),
         else => @panic("TODO unhandled cpu arch"),
     };
 }
