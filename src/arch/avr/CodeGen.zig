@@ -113,7 +113,6 @@ pub fn generate(
     code: *std.ArrayList(u8),
     debug_output: DebugInfoOutput,
 ) CodeGenError!Result {
-    _ = code; // autofix
     _ = debug_output; // autofix
     const comp = bin_file.comp;
     const zcu = comp.module.?;
@@ -127,7 +126,7 @@ pub fn generate(
         .register_manager = .{},
         .alloc = zcu.gpa,
         .zcu = zcu,
-        .tracking = comp.gpa.alloc(?ProtoData, air.instructions.len) catch unreachable,
+        .tracking = try comp.gpa.alloc(?ProtoData, air.instructions.len),
         .args = undefined,
         .bin = bin_file,
         .src_loc = src_loc,
@@ -146,30 +145,33 @@ pub fn generate(
         args: []ProtoData = undefined,
         //
     } = .{
-        .return_value = self.getReturnLoc(fn_info) catch unreachable,
-        .args = self.calcArgs(fn_info) catch unreachable,
+        .return_value = self.getReturnLoc(fn_info) catch return CodeGenError.CodegenFail,
+        .args = self.calcArgs(fn_info) catch return CodeGenError.CodegenFail,
     };
     self.args = CallConvInfo.args;
-    if (fn_info.cc != .Unspecified and fn_info.cc != .C) self.fail("Calling Conventions not supported. {s}", .{@tagName(fn_info.cc)}) catch unreachable;
+    if (fn_info.cc != .Unspecified and fn_info.cc != .C) self.fail("Calling Conventions not supported. {s}", .{@tagName(fn_info.cc)}) catch return CodeGenError.CodegenFail;
+
     {
         // Prologue
         // Y Register is callee saved
         // TODO if they are never used maybe this isn't needed
-        errdefer unreachable;
         try self.mir.append(.{ .tag = .PUSH, .data = .{ .R = .{ .rd = Register.Y[0] } } });
         try self.mir.append(.{ .tag = .PUSH, .data = .{ .R = .{ .rd = Register.Y[1] } } });
         try self.mir.append(.{ .tag = .IN, .data = .{ .R_io = .{ .rd = Register.Y[0], .io = IO.SP_L } } });
         try self.mir.append(.{ .tag = .IN, .data = .{ .R_io = .{ .rd = Register.Y[0], .io = IO.SP_H } } });
 
-        self.genBody() catch unreachable;
+        self.genBody() catch return CodeGenError.CodegenFail;
         // Epilogue
-        try self.mir.append(.{ .tag = .PUSH, .data = .{ .R = .{ .rd = Register.Y[1] } } });
-        try self.mir.append(.{ .tag = .PUSH, .data = .{ .R = .{ .rd = Register.Y[0] } } });
+        try self.mir.append(.{ .tag = .POP, .data = .{ .R = .{ .rd = Register.Y[1] } } });
+        try self.mir.append(.{ .tag = .POP, .data = .{ .R = .{ .rd = Register.Y[0] } } });
         try self.mir.append(.{ .tag = .RET, .data = .{ .none = .{} } });
     }
-    var emit = Emit{};
-    emit.emit(self.mir.items, bin_file);
-    unreachable;
+    var emit = Emit{
+        .code = code,
+        .mir = self.mir.items,
+    };
+    emit.emit();
+    return .{ .ok = {} };
 }
 
 fn fail(self: *Self, comptime reason: []const u8, args: anytype) !void {
@@ -187,8 +189,17 @@ pub const ProtoData = union(enum) {
     IOAddr: u6,
 };
 
-fn translateGenResult(self: *Self, result: codegen.GenResult) !ProtoData {
-    switch (result) {
+const Value = @import("../../Value.zig");
+const Type = @import("../../type.zig").Type;
+fn resolveInsn(self: *Self, ref: Air.Inst.Ref, t: Type) !void {
+    _ = ref; // autofix
+    _ = t; // autofix
+    codegen.genTypedValue(self.file, self.srcloc, null, null);
+}
+
+fn fromValue(self: *Self, val: Value) !ProtoData {
+    const genResult = try codegen.genTypedValue(self.bin, self.src_loc, val, self.zcu.funcOwnerDeclIndex(self.func_index));
+    switch (genResult) {
         .mcv => |value| {
             return switch (value) {
                 .none => .{ .none = {} },
@@ -210,19 +221,6 @@ fn translateGenResult(self: *Self, result: codegen.GenResult) !ProtoData {
         .fail => |f| try self.fail("Failed translate MCValue |{s}", .{f.msg}),
     }
     unreachable;
-}
-
-const Value = @import("../../Value.zig");
-const Type = @import("../../type.zig").Type;
-fn resolveInsn(self: *Self, ref: Air.Inst.Ref, t: Type) !void {
-    _ = ref; // autofix
-    _ = t; // autofix
-    codegen.genTypedValue(self.file, self.srcloc, null, null);
-}
-
-fn fromValue(self: *Self, val: Value) !ProtoData {
-    const genResult = try codegen.genTypedValue(self.bin, self.src_loc, val, self.zcu.funcOwnerDeclIndex(self.func_index));
-    return try self.translateGenResult(genResult);
 }
 
 fn deRef(self: *Self, ref: Air.Inst.Ref) !ProtoData {
@@ -303,6 +301,14 @@ pub fn spillInstruction(self: *Self, reg: Register, inst: Air.Inst.Index) !void 
     // try tracking.trackSpill(self, inst);
 }
 
+pub fn airAlloc(self: *Self, index: Air.Inst.Index) !void {
+    const insn = self.air.instructions.get(@intFromEnum(index));
+    const t = insn.data.ty;
+    const bitSize: f32 = @floatFromInt(t.bitSize(self.zcu));
+    const size: u64 = @intFromFloat(@ceil(@divExact(bitSize, 8)));
+    self.frame_size += size;
+}
+
 fn genBody(self: *Self) !void {
     const air_tags: []Air.Inst.Tag = self.air.instructions.items(.tag);
     for (self.air.getMainBody()) |insn| {
@@ -315,6 +321,8 @@ fn genBody(self: *Self) !void {
             .dbg_var_val => try self.mir.append(.{ .tag = .dbg_var_val, .data = .{ .none = .{} } }),
             .arg,
             => try self.airArg(insn),
+            .alloc,
+            => try self.airAlloc(insn),
             .add,
             => try self.airAdd(insn),
             .sub,
@@ -397,8 +405,6 @@ fn genBody(self: *Self) !void {
             .shr_exact,
             .shl_exact,
             => |ins| try self.fail("exact shifting not implemented {s}", .{@tagName(ins)}),
-            .alloc,
-            => try self.fail("Stack allocation not implemented.", .{}),
             .ret_ptr,
             .assembly,
             .not,

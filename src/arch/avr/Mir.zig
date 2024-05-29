@@ -7,7 +7,7 @@ pub const Insn = struct {
     tag: Tag,
     data: Data,
 
-    pub const Data = union {
+    pub const Data = union(enum) {
         const Reg = Register; // u5 0-31
         const UpperReg = Register; // u4 16-31
         const SmallReg = Register; // u2 24,26,28,30
@@ -104,7 +104,7 @@ pub const Insn = struct {
             s: Bit,
             pub fn encode(self: *const @This(), _insn: u16) u16 {
                 var insn = _insn & 0b1111_1110_0000_1000;
-                const rd: u16 = @intCast(@intFromEnum(self.reg));
+                const rd: u16 = @intCast(@intFromEnum(self.rd));
                 const bit: u16 = @intCast(self.s);
                 insn |= bit << 0;
                 insn |= rd << 4;
@@ -118,7 +118,7 @@ pub const Insn = struct {
             offset: i7,
             pub fn encode(self: *const @This(), _insn: u16) u16 {
                 var insn = _insn & 0b1111_1100_0000_0000;
-                const offset: u16 = @bitCast(@intFromEnum(self.offset));
+                const offset: u16 = @intCast(@as(u7, @bitCast(self.offset)));
                 const bit: u16 = @intCast(self.s);
                 insn |= bit << 0;
                 insn |= offset << 3;
@@ -131,7 +131,7 @@ pub const Insn = struct {
             offset: i7,
             pub fn encode(self: *const @This(), _insn: u16) u16 {
                 var insn = _insn & 0b1111_1100_0000_0111;
-                const offset: u16 = @bitCast(@intFromEnum(self.offset));
+                const offset: u16 = @intCast(@as(u7, @bitCast(self.offset)));
                 insn |= offset << 3;
                 return insn;
             }
@@ -142,7 +142,7 @@ pub const Insn = struct {
             addr: u22,
             pub fn encode(self: *const @This(), _insn: u32) u32 {
                 var insn = _insn & 0b1111_1110_0000_1110_0000_0000_0000_0000;
-                const offset: u32 = @intCast(@intFromEnum(self.offset));
+                const offset: u32 = @intCast(self.addr);
                 insn |= (offset >> 22 - 5) << (19);
                 insn |= (offset & 0b1_1111_1111_1111_1111);
                 return insn;
@@ -155,8 +155,8 @@ pub const Insn = struct {
             s: Bit,
             pub fn encode(self: *const @This(), _insn: u16) u16 {
                 var insn = _insn & 0b1111_1111_0000_0000;
-                const lower_io: u16 = @intCast(@intFromEnum(self.lower_io));
-                const s: u16 = @intCast(@intFromEnum(self.s));
+                const lower_io: u16 = @intCast(self.lower_io);
+                const s: u16 = @intCast(self.s);
                 insn |= lower_io << 3;
                 insn |= s << 0;
                 return insn;
@@ -168,7 +168,7 @@ pub const Insn = struct {
             k: u4,
             pub fn encode(self: *const @This(), _insn: u16) u16 {
                 var insn = _insn & 0b1111_1111_0000_1111;
-                const k: u16 = @intCast(@intFromEnum(self.k));
+                const k: u16 = @intCast(self.k);
                 insn |= k << 4;
                 return insn;
             }
@@ -180,17 +180,38 @@ pub const Insn = struct {
             rd: Reg,
             wr: WideRegister,
             inc: WrInc,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                _ = self; // autofix
+                var insn = _insn & 0b1111_1111_0000_1111;
+                _ = &insn;
+                unreachable;
+            }
         },
         // xxxx xxxx xddd xrrr
         mul: struct {
             rd: MulReg,
             rr: MulReg,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                _ = self; // autofix
+                var insn = _insn & 0b1111_1111_0000_1111;
+                _ = &insn;
+                unreachable;
+            }
         },
         // IN
         // xxxx xIId dddd IIII
         R_io: struct {
             rd: Reg,
             io: u6,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                var insn = _insn & 0b1111_1000_0000_0000;
+                const rd: u16 = @intCast(@intFromEnum(self.rd));
+                const io: u16 = @intCast(self.io);
+                insn |= rd << 4;
+                insn |= (io & 0b11_0000) << 3;
+                insn |= (io & 0b00_1111) << 0;
+                return insn;
+            }
         },
         // LD/ST
         // Q is displacement from addr
@@ -199,12 +220,24 @@ pub const Insn = struct {
             rd: Reg,
             wr: WideRegister,
             q: u6,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                _ = self; // autofix
+                var insn = _insn & 0b1111_1111_0000_1111;
+                _ = &insn;
+                unreachable;
+            }
         },
         // LDS
         // xxxx xxxd dddd xxxx kkkk kkkk kkkk kkkk
         R_u16: struct {
             rd: Reg,
             addr: u16,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                _ = self; // autofix
+                var insn = _insn & 0b1111_1111_0000_1111;
+                _ = &insn;
+                unreachable;
+            }
         },
         // LDS(AVRrc)
         // xxxx xkkk dddd kkkk
@@ -213,143 +246,202 @@ pub const Insn = struct {
         r_u7: struct {
             rd: UpperReg,
             addr: u7,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                _ = self; // autofix
+                var insn = _insn & 0b1111_1111_0000_1111;
+                _ = &insn;
+                unreachable;
+            }
         },
         // xxxx xxxx dddd rrrr
         movw: struct {
             rd: MovwReg,
             rr: MovwReg,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                _ = self; // autofix
+                var insn = _insn & 0b1111_1111_0000_1111;
+                _ = &insn;
+                unreachable;
+            }
         },
         // xxxx kkkk kkkk kkkk
         // rcall and rjmp
         rcall: struct {
             offset: u12,
+            pub fn encode(self: *const @This(), _insn: u16) u16 {
+                _ = self; // autofix
+                var insn = _insn & 0b1111_1111_0000_1111;
+                _ = &insn;
+                unreachable;
+            }
         },
     };
-    pub const Tag = enum {
-        placeholder,
-        // TODO Maybe add seperate instrutions for ST_X ST_Y ST_Z... etc
-        dbg_stmt,
-        dbg_inline_block,
-        dbg_var_ptr,
-        dbg_var_val,
-        ADD,
-        ADC,
-        ADIW,
-        SUB,
-        SUBI,
-        SBC,
-        SBCI,
-        SBIW,
-        AND,
-        ANDI,
-        OR,
-        ORI,
-        EOR,
-        COM,
-        NEG,
-        SBR,
-        CBR,
-        INC,
-        DEC,
-        TST,
-        CLR,
-        SER,
-        MUL,
-        MULS,
-        MULSU,
-        FMUL,
-        FMULS,
-        FMULSU,
-        DES,
-        RJMP,
-        IJMP,
-        EIJMP,
-        JMP,
-        RCALL,
-        ICALL,
-        EICALL,
-        CALL,
-        RET,
-        RETI,
-        CPSE,
-        CP,
-        CPC,
-        CPI,
-        SBRC,
-        SBRS,
-        SBIC,
-        SBIS,
-        BRBS,
-        BRBC,
-        BREQ,
-        BRNE,
-        BRCS,
-        BRCC,
-        BRSH,
-        BRLO,
-        BRMI,
-        BRPL,
-        BRGE,
-        BRLT,
-        BRHS,
-        BRHC,
-        BRTS,
-        BRTC,
-        BRVS,
-        BRVC,
-        BRIE,
-        BRID,
-        MOV,
-        MOVW,
-        LDI,
-        LDS,
-        LD,
-        LDD,
-        STS,
-        ST,
-        STD,
-        LPM,
-        ELPM,
-        SPM,
-        IN,
-        OUT,
-        PUSH,
-        POP,
-        XCH,
-        LAS,
-        LAC,
-        LAT,
-        LSL,
-        LSR,
-        ROL,
-        ROR,
-        ASR,
-        SWAP,
-        SBI,
-        CBI,
-        BST,
-        BLD,
-        BSET,
-        BCLR,
-        SEC,
-        CLC,
-        SEN,
-        CLN,
-        SEZ,
-        CLZ,
-        SEI,
-        CLI,
-        SES,
-        CLS,
-        SEV,
-        CLV,
-        SET,
-        CLT,
-        SEH,
-        CLH,
-        BREAK,
-        NOP,
-        SLEEP,
-        WDR,
+    pub const Tag = enum(u16) {
+        // zig fmt: off
+        placeholder      = 0b1111_1111_1111_1111,
+        dbg_stmt         = 0b1111_1111_1111_1110,
+        dbg_inline_block = 0b1111_1111_1111_1101,
+        dbg_var_ptr      = 0b1111_1111_1111_1100,
+        dbg_var_val      = 0b1111_1111_1111_1011,
+
+        ADC              = 0b0001_1100_0000_0000,
+        ADD              = 0b0000_1100_0000_0000,
+        ADIW             = 0b1001_0110_0000_0000,
+        AND              = 0b0010_0000_0000_0000,
+        ANDI             = 0b0111_0000_0000_0000,
+        ASR              = 0b1001_0100_0000_0101,
+        BCLR             = 0b1001_0100_1000_1000,
+        BLD              = 0b1111_1000_0000_0000,
+        BRBC             = 0b1111_0100_0000_0000,
+        BRBS             = 0b1111_0000_0000_0000,
+        // BRCC          = 0b1111_0100_0000_0000, // BRBC 0, k
+        // BRCS          = 0b1111_0000_0000_0000, // BRBS 0, k
+        BREAK            = 0b1001_0101_1001_1000,
+        BREQ             = 0b1111_0000_0000_0001,
+        BRGE             = 0b1111_0100_0000_0100,
+        BRHC             = 0b1111_0100_0000_0101,
+        BRHS             = 0b1111_0000_0000_0101,
+        BRID             = 0b1111_0100_0000_0111,
+        BRIE             = 0b1111_0000_0000_0111,
+        // BRLO          = 0b1111_0000_0000_0000, // BRBS 0, k
+        BRLT             = 0b1111_0000_0000_0100,
+        BRMI             = 0b1111_0000_0000_0010,
+        BRNE             = 0b1111_0100_0000_0001,
+        BRPL             = 0b1111_0100_0000_0010,
+        // BRSH          = 0b1111_0100_0000_0000, // BRBC 0, k
+        BRTC             = 0b1111_0100_0000_0110,
+        BRTS             = 0b1111_0000_0000_0110,
+        BRVC             = 0b1111_0100_0000_0011,
+        BRVS             = 0b1111_0000_0000_0011,
+        BSET             = 0b1001_0100_0000_1000,
+        BST              = 0b1111_1010_0000_0000,
+        CALL             = 0b1001_0100_0000_1110,
+        CBI              = 0b1001_1000_0000_0000,
+        // CBR           =           0b0ee_0NDI_with_0_complemente0,
+        // CLC              = 0b1001_0100_1000_1000, // BCLR 0
+        // CLH              = 0b1001_0100_1101_1000, // BCLR 5
+        CLI              = 0b1001_0100_1111_1000,
+        CLN              = 0b1001_0100_1010_1000,
+        // CLR              = 0b0010_0100_0000_0000, // EOR rd,rd
+        CLS              = 0b1001_0100_1100_1000,
+        CLT              = 0b1001_0100_1110_1000,
+        CLV              = 0b1001_0100_1011_1000,
+        CLZ              = 0b1001_0100_1001_1000,
+        COM              = 0b1001_0100_0000_0000,
+        CP               = 0b0001_0100_0000_0000,
+        CPC              = 0b0000_0100_0000_0000,
+        CPI              = 0b0011_0000_0000_0000,
+        CPSE             = 0b0001_0000_0000_0000,
+        DEC              = 0b1001_0100_0000_1010,
+        DES              = 0b1001_0100_0000_1011,
+        EICALL           = 0b1001_0101_0001_1001,
+        EIJMP            = 0b1001_0100_0001_1001,
+
+        ELPM_R0          = 0b1001_0101_1101_1000,
+        ELPM_RD_Z        = 0b1001_0000_0000_0110,
+        ELPM_RD_Z_inc    = 0b1001_0000_0000_0111,
+
+        EOR              = 0b0010_0100_0000_0000,
+        FMUL             = 0b0000_0011_0000_1000,
+        FMULS            = 0b0000_0011_1000_0000,
+        FMULSU           = 0b0000_0011_1000_1000,
+        ICALL            = 0b1001_0101_0000_1001,
+        IJMP             = 0b1001_0100_0000_1001,
+        IN               = 0b1011_0000_0000_0000,
+        INC              = 0b1001_0100_0000_0011,
+        JMP              = 0b1001_0100_0000_1100,
+        LAC              = 0b1001_0010_0000_0110,
+        LAS              = 0b1001_0010_0000_0101,
+        LAT              = 0b1001_0010_0000_0111,
+
+        LD_X             = 0b1001_0000_0000_1100,
+        LD_X_inc         = 0b1001_0000_0000_1101,
+        LD_X_dec         = 0b1001_0000_0000_1110,
+
+        // LD_Y             = 0b1000_0000_0000_1000,
+        LD_Y_inc         = 0b1001_0000_0000_1001,
+        LD_Y_dec         = 0b1001_0000_0000_1010,
+        LD_Y_q           = 0b1000_0000_0000_1000,
+
+        // LD_Z             = 0b1000_0000_0000_0000,
+        LD_Z_inc         = 0b1001_0000_0000_0001,
+        LD_Z_dec         = 0b1001_0000_0000_0010,
+        LD_Z_q           = 0b1000_0000_0000_0000,
+
+        LDI              = 0b1110_0000_0000_0000,
+        LDS              = 0b1001_0000_0000_0000,
+        LDS_rc           = 0b1010_0000_0000_0000,
+
+        LPM_R0           = 0b1001_0101_1100_1000,
+        LPM_RD           = 0b1001_0000_0000_0100,
+        LPM_RD_Z_inc     = 0b1001_0000_0000_0101,
+
+        // LSL              = 0b0000_1100_0000_0000, // ADD rd,rd
+        LSR              = 0b1001_0100_0000_0110,
+        MOV              = 0b0010_1100_0000_0000,
+        MOVW             = 0b0000_0001_0000_0000,
+        MUL              = 0b1001_1100_0000_0000,
+        MULS             = 0b0000_0010_0000_0000,
+        MULSU            = 0b0000_0011_0000_0000,
+        NEG              = 0b1001_0100_0000_0001,
+        NOP              = 0b0000_0000_0000_0000,
+        OR               = 0b0010_1000_0000_0000,
+        ORI              = 0b0110_0000_0000_0000,
+        OUT              = 0b1011_1000_0000_0000,
+        POP              = 0b1001_0000_0000_1111,
+        PUSH             = 0b1001_0010_0000_1111,
+        RCALL            = 0b1101_0000_0000_0000,
+        RET              = 0b1001_0101_0000_1000,
+        RETI             = 0b1001_0101_0001_1000,
+        RJMP             = 0b1100_0000_0000_0000,
+        // ROL              = 0b0001_1100_0000_0000, // ADC rd,rd
+        ROR              = 0b1001_0100_0000_0111,
+        SBC              = 0b0000_1000_0000_0000,
+        SBCI             = 0b0100_0000_0000_0000,
+        SBI              = 0b1001_1010_0000_0000,
+        SBIC             = 0b1001_1001_0000_0000,
+        SBIS             = 0b1001_1011_0000_0000,
+        SBIW             = 0b1001_0111_0000_0000,
+        // SBR              = 0b0110_0000_0000_0000, // literally ORI 
+        SBRC             = 0b1111_1100_0000_0000,
+        SBRS             = 0b1111_1110_0000_0000,
+        // SEC              = 0b1001_0100_0000_1000, // BSET 0
+        SEH              = 0b1001_0100_0101_1000,
+        SEI              = 0b1001_0100_0111_1000,
+        SEN              = 0b1001_0100_0010_1000,
+        SER              = 0b1110_1111_0000_1111,
+        SES              = 0b1001_0100_0100_1000,
+        SET              = 0b1001_0100_0110_1000,
+        SEV              = 0b1001_0100_0011_1000,
+        SEZ              = 0b1001_0100_0001_1000,
+        SLEEP            = 0b1001_0101_1000_1000,
+        SPM              = 0b1001_0101_1110_1000,
+
+        // SPM_xm_xt        = 0b1001_0101_1110_1000, // SPM
+        SPM_xm_xt_Z_inc  = 0b1001_0101_1111_1000,
+
+        ST_X             = 0b1001_0010_0000_1100,
+        ST_X_inc         = 0b1001_0010_0000_1101,
+        ST_X_dec         = 0b1001_0010_0000_1110,
+
+        // ST_Y             = 0b1000_0010_0000_1000,
+        ST_Y_inc         = 0b1001_0010_0000_1001,
+        ST_Y_dec         = 0b1001_0010_0000_1010,
+        ST_Y_q           = 0b1000_0010_0000_1000,
+
+        // ST_Z             = 0b1000_0010_0000_0000,
+        ST_Z_inc         = 0b1001_0010_0000_0001,
+        ST_Z_dec         = 0b1001_0010_0000_0010,
+        ST_Z_q           = 0b1000_0010_0000_0000,
+
+        STS              = 0b1001_0010_0000_0000,
+        STS_rc           = 0b1010_1000_0000_0000,
+        SUB              = 0b0001_1000_0000_0000,
+        SUBI             = 0b0101_0000_0000_0000,
+        SWAP             = 0b1001_0100_0000_0010,
+        // TST              = 0b0010_0000_0000_0000, // AND Rd, Rd
+        WDR              = 0b1001_0101_1010_1000,
+        XCH              = 0b1001_0010_0000_010,
+        // zig fmt: on
     };
 };

@@ -74,7 +74,7 @@ const riscv64_relocs = Table(11, elf.R_RISCV, .{
 });
 
 //TODO This is 100% incorrect. I don't know what relocations are...
-// const avr_relocs = Table(0, elf.R_AVR, .{});
+const avr_relocs = riscv64_relocs;
 
 pub fn decode(r_type: u32, cpu_arch: std.Target.Cpu.Arch) ?Kind {
     return switch (cpu_arch) {
