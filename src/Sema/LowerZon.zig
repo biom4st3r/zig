@@ -757,6 +757,21 @@ fn lowerStruct(self: *LowerZon, node: Zoir.Node.Index, res_ty: Type) !InternPool
     const fields: @FieldType(Zoir.Node, "struct_literal") = switch (node.get(self.file.zoir.?)) {
         .struct_literal => |fields| fields,
         .empty_literal => .{ .names = &.{}, .vals = .{ .start = node, .len = 0 } },
+        .enum_litereal => |name| {
+            const decl_name = try ip.getOrPutString(
+                self.sema.gpa,
+                self.sema.pt.tid,
+                name.get(self.file.zoir.?),
+                .no_embedded_nulls,
+            );
+            for (ip.namespacePtr(struct_info.namespace).pub_decls.keys()) |decl| {
+                const nav = ip.getNav(decl);
+                if (nav.name == decl_name) {
+                    assert(nav.status == .fully_resolved);
+                    return nav.status.fully_resolved.val;
+                }
+            }
+        },
         else => return error.WrongType,
     };
 
@@ -905,6 +920,13 @@ fn lowerUnion(self: *LowerZon, node: Zoir.Node.Index, res_ty: Type) !InternPool.
                 name.get(self.file.zoir.?),
                 .no_embedded_nulls,
             );
+            for (ip.namespacePtr(union_info.namespace).pub_decls.keys()) |decl| {
+                const nav = ip.getNav(decl);
+                if (nav.name == field_name) {
+                    assert(nav.status == .fully_resolved);
+                    return nav.status.fully_resolved.val;
+                }
+            }
             break :b .{ field_name, null };
         },
         .struct_literal => b: {
